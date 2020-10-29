@@ -38,10 +38,30 @@ module Tilt
 
     # for now caching is not supported, but at least we can transparently ignore it
     def cache!(key=nil, options={}, &block)
-      yield
+      value = _cache_fragment_for(key, options) do
+        _scope { block.call }
+      end
+
+      merge!(value)
     end
 
     private
+
+    def _cache_fragment_for(key, options, &block)
+      _read_fragment_cache(key, options) || _write_fragment_cache(key, options, &block)
+    end
+
+    def _read_fragment_cache(key, options = nil)
+      ::Rails.cache.read(key, options)
+    end
+
+    def _write_fragment_cache(key, options = nil)
+      yield.tap do |value|
+        ::Rails.cache.write(key, value, options)
+      end
+    end
+
+
     def fetch_partial_path(file, view_path)
       view_path ||= ::Dir.pwd
       ::Dir[::File.join(view_path, partialized(file) + ".{*.,}jbuilder")].first
